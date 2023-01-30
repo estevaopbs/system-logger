@@ -2,7 +2,7 @@
 Generate system logs with useful information.
 ## Purpose
 Provide a clean, lightweight, and practical way to track system resource consumption over time.
-## Instalation
+## Install
 To install you must run the following commands:
 ```bash
 git clone https://github.com/estevaopbs/system-logger.git
@@ -30,8 +30,14 @@ log_dir=$HOME/.cache/system-logger
 The script works by running the command ```top``` and recording the header data in a csv format.
 ## Compatibility
 The tool is set up to only work with bash shell, because it uses aliases stored in the .bashrc file during installation. However, it can easily be adapted to work with other shells. To do this, you just need to add the equivalent of the following bash code to the end of the equivalent of the .bashrc file for the specific shell you are using.
-
 ```bash
 alias logger-start="nohup system-logger &> /home/estevao/.cache/system-logger/logger-execution.log &"
 alias logger-stop="kill \$(ps -ef | grep system-logger | grep -v grep | awk '{print \$2}')"
 ```
+## Uninstall
+To uninstall the system-logger you must just cd to the system-logger directory (the one which was cloned from git), then run
+```
+chmod +x uninstall.sh
+uninstall.sh
+```
+Then remove the aliases added to .bashrc by at installation. If you're running it on other shell than bash, then also remove the aliases you added to the .bashrc equivalent in your shell.
