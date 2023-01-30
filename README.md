@@ -18,7 +18,7 @@ logger-stop     # stops the system-logger
 ```
 Since it's still a quite simple application it doesn't do some trivial verifications. Multiple instances of system-logger can run at the same time generating unwanted behavior. Please make sure no instance of system-logger is running before execute ```logger-start```.
 ## Configuration
-System logger has only two execution parameters which can be found at ```~/.config/system-logger.conf```. The default configuration is:
+System logger has only two execution parameters which can be found at ```~/.config/system-logger.conf```. The default configuration is
 ```conf
 time_interval=60
 log_dir=$HOME/.cache/system-logger
