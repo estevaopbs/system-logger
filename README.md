@@ -31,7 +31,7 @@ The script works by running the command ```top``` and recording the header data 
 ## Compatibility
 The tool is set up to only work with bash shell, because it uses aliases stored in the .bashrc file during installation. However, it can easily be adapted to work with other shells. To do this, you just need to add the equivalent of the following bash code to the end of the equivalent of the .bashrc file for the specific shell you are using.
 ```bash
-alias logger-start="nohup system-logger &> /home/estevao/.cache/system-logger/logger-execution.log &"
+alias logger-start="nohup system-logger &> $HOME/.cache/system-logger/logger-execution.log &"
 alias logger-stop="kill \$(ps -ef | grep system-logger | grep -v grep | awk '{print \$2}')"
 ```
 ## Uninstall
