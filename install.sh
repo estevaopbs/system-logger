@@ -1,3 +1,4 @@
+chmod +x ./source/system-logger
 cp ./source/system-logger $HOME/.local/bin/system-logger
 logger_path=$HOME/.cache/system-logger
 mkdir -p -v $logger_path
