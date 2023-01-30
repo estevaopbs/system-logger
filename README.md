@@ -40,4 +40,4 @@ To uninstall the system-logger you must just cd to the system-logger directory (
 chmod +x uninstall.sh
 uninstall.sh
 ```
-Then remove the aliases added to .bashrc by at installation. If you're running it on other shell than bash, then also remove the aliases you added to the .bashrc equivalent in your shell.
+Then remove the aliases added to .bashrc by at installation. If you're running it on other shell than bash, then also remove the aliases you added to the equivalent of the .bashrc file for the shell you are using.
