@@ -1,17 +1,13 @@
 #!/bin/bash
 
 
-function startup {
-    if ! [[ -d $HOME/.config ]]; then
-        mkdir $HOME/.config
-    fi
-    if ! [[ -f $HOME/.config/system-logger.conf ]]; then
-        echo "time_interval=60" > $HOME/.config/system-logger.conf
-        echo "log_dir=$HOME/.cache/system-logger" >> $HOME/.config/system-logger.conf
-    fi
-}
-
-startup
+if ! [[ -d $HOME/.config ]]; then
+    mkdir $HOME/.config
+fi
+if ! [[ -f $HOME/.config/system-logger.conf ]]; then
+    echo "time_interval=60" > $HOME/.config/system-logger.conf
+    echo "log_dir=$HOME/.cache/system-logger" >> $HOME/.config/system-logger.conf
+fi
 time_interval=0
 log_dir=""
 while read line; do
@@ -28,7 +24,7 @@ while true; do
     today=$(date +"%Y-%m-%d")
     while true; do
         if ! [[ -f $log_dir/$today"_system.log" ]]; then
-            echo "timestamp,up,users,load average 1,load average 5,load average 15,Tasks total,Tasks running,Tasks sleeping,Tasks stopped,Tasks zombie,%Cpu(s) us,%Cpu(s) sy,%Cpu(s) ni,%Cpu(s) id,%Cpu(s) wa,%Cpu(s) hi,%Cpu(s) si,%Cpu(s) st,MiB Mem total,MiB Mem free,MiB Mem used,MiB Mem buff/cache,MiB Swap total,MiB Swap free,MiB Swap used,avail Mem" > $log_dir/$today"_system.log"
+            echo "timestamp,up,users,load average 1,load average 5,load average 15,Tasks total,Tasks running,Tasks sleeping,Tasks stopped,Tasks zombie,%Cpu(s) us,%Cpu(s) sy,%Cpu(s) ni,%Cpu(s) id,%Cpu(s) wa,%Cpu(s) hi,%Cpu(s) si,%Cpu(s) st,MiB Mem free,MiB Mem used,MiB Mem buff/cache,MiB Swap free,MiB Swap used,avail Mem" > $log_dir/$today"_system.log"
         fi
         top_out=$(top -bn1 | grep -Eo "(.*load average.*)|(Tasks:.*)|(%Cpu\(s\):.*)|(MiB Mem :.*)|(MiB Swap:.*)" | tr "\n" " ")
         timestamp=$(echo $(date +"%Y-%m-%d") $(echo $top_out | grep -Po "[0-9:]+(?= up)"))
@@ -58,15 +54,13 @@ while true; do
         Cpus_hi=$(echo $top_out | grep -Po "[0-9.]+(?= hi )")
         Cpus_si=$(echo $top_out | grep -Po "[0-9.]+(?= si )")
         Cpus_st=$(echo $top_out | grep -Po "[0-9.]+(?= st )")
-        MiB_Mem_total=$(echo $top_out | grep -Po "(?<=MiB Mem : )[0-9.]+(?= total)")
         MiB_Mem_free=$(echo $top_out | grep -Po "[0-9.]+(?= free)" | head -n 1)
         MiB_Mem_used=$(echo $top_out | grep -Po "[0-9.]+(?= used )")
         MiB_Mem_buff_cache=$(echo $top_out | grep -Po "[0-9.]+(?= buff)")
-        MiB_Swap_total=$(echo $top_out | grep -Po "(?<=MiB Swap: )[0-9.]+(?= total)")
         MiB_Swap_free=$(echo $top_out| grep -Po "[0-9.]+(?= free)" | tail -n 1)
         MiB_Swap_used=$(echo $top_out | grep -Po "[0-9.]+(?= used\.)")
         avail_Mem=$(echo $top_out | grep -Po "[0-9.]+(?= avail Mem)")
-        echo $timestamp","$up","$users","$load_average_1","$load_average_5","$load_average_15","$Tasks_total","$Tasks_running","$Tasks_sleeping","$Tasks_stopped","$Tasks_zombie","$Cpus_us","$Cpus_sy","$Cpus_ni","$Cpus_id","$Cpus_wa","$Cpus_hi","$Cpus_si","$Cpus_st","$MiB_Mem_total","$MiB_Mem_free","$MiB_Mem_used","$MiB_Mem_buff_cache","$MiB_Swap_total","$MiB_Swap_free","$MiB_Swap_used","$avail_Mem >> $log_dir/$today"_system.log"
+        echo $timestamp","$up","$users","$load_average_1","$load_average_5","$load_average_15","$Tasks_total","$Tasks_running","$Tasks_sleeping","$Tasks_stopped","$Tasks_zombie","$Cpus_us","$Cpus_sy","$Cpus_ni","$Cpus_id","$Cpus_wa","$Cpus_hi","$Cpus_si","$Cpus_st","$MiB_Mem_free","$MiB_Mem_used","$MiB_Mem_buff_cache","$MiB_Swap_free","$MiB_Swap_used","$avail_Mem >> $log_dir/$today"_system.log"
         sleep $time_interval
     done
 done
