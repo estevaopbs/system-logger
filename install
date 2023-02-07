@@ -1,4 +1,10 @@
+#!/bin/bash
+
 chmod +x ./source/system-logger
+mkdir -p -v $HOME/.local/bin
+if ! echo $PATH | grep -q -w "/path/to/directory"; then
+  echo "PATH=$HOME/.local/bin:\$PATH" >> $HOME/.bashrc
+fi
 cp ./source/system-logger $HOME/.local/bin/system-logger
 logger_path=$HOME/.cache/system-logger
 mkdir -p -v $logger_path
