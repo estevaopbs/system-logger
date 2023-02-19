@@ -1,29 +1,80 @@
 #!/bin/bash
 
+# Startup checks
 if ! [[ -d $HOME/.config ]]; then
     mkdir $HOME/.config
 fi
+
+# Get partitions
+disks_str=$(df | grep -v /boot/efi  | awk "{print \$1}" | grep -oP "(?<=/dev/).*" | uniq)
+#devices=()
+partitions=()
+IFS=$'\n' read -rd '' -a disks <<< "$disks_str"
+index=0
+for disk0 in "${disks[@]}"; do
+    disk_partitions=()
+    for disk1 in "${disks[@]:index+1}"; do
+        if [[ "$disk1" == *"$disk0"* ]]; then
+            disk_partitions+=($disk1)
+        else
+            break
+        fi
+    done
+    length=${#disk_partitions[@]}
+    if [[ $length > 0 ]]; then
+        #devices+=($disk0)
+        partitions+=( ${disk_partitions[@]} )
+    fi
+    index=$((index + 1))
+done
+
 if ! [[ -f $HOME/.config/system-logger.conf ]]; then
-    echo "time_interval=60" > $HOME/.config/system-logger.conf
+    echo "time_interval=1" > $HOME/.config/system-logger.conf
     echo "log_dir=$HOME/.cache/system-logger" >> $HOME/.config/system-logger.conf
+    echo "partitions=(${partitions[@]})" >> $HOME/.config/system-logger.conf
 fi
-time_interval=60
+
+# Read configs
+time_interval=1
 log_dir=""
 while read line; do
     if [[ $line =~ ^time_interval=([0-9]+) ]]; then
         time_interval=${BASH_REMATCH[1]}
     elif [[ $line =~ ^log_dir=(.+) ]]; then
         log_dir=${BASH_REMATCH[1]}
+    elif [[ $line =~ ^partitions=\((.+)\) ]]; then
+        IFS=' '
+        read -a partitions <<< ${BASH_REMATCH[1]}
     fi
 done < $HOME/.config/system-logger.conf
 if ! [[ -f $log_dir ]]; then
     mkdir -p -v "$log_dir"
 fi
+
+# Constants
 cpu_cores=$(grep -c ^processor /proc/cpuinfo)
-IFS='\n'
-disks_str=$(awk '$3 !~ /ram|loop|sr0|dm-0/ {print $3}' /proc/diskstats | grep -oE [a-z]+ | sort -u)
-IFS=$'\n' read -rd '' -a disks <<< "$disks_str"
 internet_interface=$(ip route show | awk '/default/ {print $5}')
+memtotal=$(cat /proc/meminfo | awk '$1 ~ /MemTotal:/ {print $2}')
+swaptotal=$(cat /proc/meminfo | awk '$1 ~ /SwapTotal:/ {print $2}')
+
+# Start values
+last_read=()
+last_write=()
+for partition in "${partitions[@]}"; do
+    diskstats=$(cat /proc/diskstats)
+    read=$(echo $diskstats | awk "\$3 == \"$partition\" {print \$6}")
+    write=$(echo $diskstats | awk "\$3 == \"$partition\" {print \$10}")
+    last_read+=($read)
+    last_write+=($write)
+    index=$((index + 1))
+done
+
+net_dev=$(cat /proc/net/dev | grep "$internet_interface")
+last_received=$(echo $net_dev | awk '{print $2}')
+last_transmitted=$(echo $net_dev | awk '{print $10}')
+
+sleep $time_interval
+
 while true; do
     today=$(date +"%Y-%m-%d")
     while true; do
@@ -34,9 +85,9 @@ while true; do
                 header="$header"cpu"$i,"
             done
             IFS=' '
-            header="$header"intr,ctxt,btime,processes,procs_running,procs_blocker,softirq,MemFree,SwapFree,
-            for disk in "${disks[@]}"; do
-                header=$header"$disk"_free,"$disk"_read,"$disk"_write,
+            header="$header"mem_usage,swap_usage,
+            for partition in "${partitions[@]}"; do
+                header=$header"$partition"_usage,"$partition"_read,"$partition"_write,
             done
             header=$header"$internet_interface"_received,"$internet_interface"_transmitted
             echo $header > $log_dir/$today.csv
@@ -50,8 +101,8 @@ while true; do
         fi
         stat=$(cat /proc/stat)
         meminfo=$(cat /proc/meminfo)
-        mounts=$(cat /proc/mounts)
-        net_dev=$(cat /proc/net/dev)
+        net_dev=$(cat /proc/net/dev | grep "$internet_interface")
+        diskstats=$(cat /proc/diskstats)
         row=$timestamp
         cpu_stat=$(echo "$stat" | grep "^cpu[0-9]" | sed 's/cpu[0-9]\+ //g')
         IFS=$'\n' read -rd '' -a cpu_data <<< "$cpu_stat"
@@ -63,22 +114,42 @@ while true; do
                 core_full_time=$((core_full_time + core_time))
             done
             core_id=$(echo $core_data | awk '{print $4}')
-            core_usage=$((100000 * core_id))
-            core_usage=$((core_usage / core_full_time))
-            core_usage=$((100000 - core_usage))
+            core_usage=$(( 100000 - ( ( 100000 * core_id ) / core_full_time ) ))
             row=$row,$core_usage
         done
-        row=$row,$(echo $stat | awk '$1 ~ /intr|ctxt|btime|processes|procs_running|procs_blocked|softirq/ {print $2}' | tr '\n' ',')
-        row=$row$(echo $meminfo | awk '$1 ~ /MemFree:|SwapFree/ {print $2}' | tr '\n', ',')
-        for disk in "${disks[@]}"; do
-            sector_size=$(cat /sys/class/block/$disk/queue/hw_sector_size)
-            disk_size=$(cat /sys/class/block/$disk/size)
-            free_space=$(($disk_size * $sector_size)) 
-            read=$(cat /proc/diskstats | awk "\$3 == \"$disk\" {print \$6}")
-            write=$(cat /proc/diskstats | awk "\$3 == \"$disk\" {print \$10}")
-            row=$row$free_space,$read,$write,
+        memfree=$(echo $meminfo | awk '$1 ~ /MemFree:/ {print $2}')
+        memusage=$(( ( 1000 * ( memtotal - memfree ) ) / memtotal ))
+        swapfree=$(echo $meminfo | awk '$1 ~ /SwapFree:/ {print $2}')
+        swapusage=$(( ( 1000 * ( swaptotal - swapfree ) ) / swaptotal ))
+        row=$row,$memusage,$swapusage,
+        index=0
+        read_arr=()
+        write_arr=()
+        for partition in "${partitions[@]}"; do
+            df_line=$(df /dev/$partition | sed 1d)
+            used=$(echo $df_line | awk '{print $3}')
+            available=$(echo $df_line | awk '{print $4}')
+            usage=$(( ( 1000 * used ) / ( used + available ) ))
+            read=$(echo $diskstats | awk "\$3 == \"$partition\" {print \$6}")
+            write=$(echo $diskstats | awk "\$3 == \"$partition\" {print \$10}")
+            partition_last_read=${last_read[$index]}
+            partition_last_write=${last_write[$index]}
+            read_diff=$(( read - partition_last_read ))
+            write_diff=$(( write - partition_last_write ))
+            read_arr+=($read)
+            write_arr+=($write)
+            row=$row$usage,$read_diff,$write_diff,
+            index=$((index + 1))
         done
-        row=$row$(grep "$internet_interface" /proc/net/dev | awk '{print $2}'),$(grep "$internet_interface" /proc/net/dev | awk '{print $10}')
+        last_read=(${read_arr[@]})
+        last_write=(${write_arr[@]})
+        received=$(echo $net_dev | awk '{print $2}')
+        transmitted=$(echo $net_dev | awk '{print $10}')
+        received_diff=$(( received - last_received ))
+        transmitted_diff=$(( transmitted - last_transmitted ))
+        last_received=$received
+        last_transmitted=$transmitted
+        row=$row$received_diff,$transmitted_diff
         echo $row >> $log_dir/$today.csv
         sleep $time_interval
     done

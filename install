@@ -11,9 +11,34 @@ mkdir -p -v $logger_path
 if ! [[ -d $HOME/.config ]]; then
     mkdir $HOME/.config
 fi
+
+# Get partitions
+disks_str=$(df | grep -v /boot/efi  | awk "{print \$1}" | grep -oP "(?<=/dev/).*" | uniq)
+#devices=()
+partitions=()
+IFS=$'\n' read -rd '' -a disks <<< "$disks_str"
+index=0
+for disk0 in "${disks[@]}"; do
+    disk_partitions=()
+    for disk1 in "${disks[@]:index+1}"; do
+        if [[ "$disk1" == *"$disk0"* ]]; then
+            disk_partitions+=($disk1)
+        else
+            break
+        fi
+    done
+    length=${#disk_partitions[@]}
+    if [[ $length > 0 ]]; then
+        #devices+=($disk0)
+        partitions+=( ${disk_partitions[@]} )
+    fi
+    index=$((index + 1))
+done
+
 if ! [[ -f $HOME/.config/system-logger.conf ]]; then
-    echo "time_interval=60" > $HOME/.config/system-logger.conf
+    echo "time_interval=1" > $HOME/.config/system-logger.conf
     echo "log_dir=$HOME/.cache/system-logger" >> $HOME/.config/system-logger.conf
+    echo "partitions=(${partitions[@]})" >> $HOME/.config/system-logger.conf
 fi
 echo "alias logger-start=\"nohup system-logger &> $logger_path/logger-execution.log &\"" >> $HOME/.bashrc
 echo "alias logger-stop=\"kill \\\$(ps -ef | grep system-logger | grep -v grep | awk '{print \\\$2}')\"" >> $HOME/.bashrc
